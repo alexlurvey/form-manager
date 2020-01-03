@@ -42,7 +42,7 @@ You define your form's fields as an object or JSON file. A field is an object wi
 ```
 The goal is to handle any amount of nesting as well as arrays containing either values or more fields.
 
-When `buildForm` is called this object will be parsed to find each field and create a stream using the [fromDomEvent](https://github.com/thi-ng/umbrella/tree/master/packages/rstream#other-stream-creation-helpers) creation helper from `@thi.ng/rstream`. These streams are stored in a flat file keyed by the full path to the field.
+When `buildForm` is called this object will be parsed to find each field and create a stream using the [fromDomEvent](https://github.com/thi-ng/umbrella/tree/master/packages/rstream#other-stream-creation-helpers) creation helper from `@thi.ng/rstream`. These streams are stored in a flat object keyed by the full path to the field.
 ```
 {
     "name": stream(),
