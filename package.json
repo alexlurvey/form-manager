@@ -1,0 +1,35 @@
+{
+  "name": "form-manager",
+  "version": "1.0.0",
+  "description": "Define, alter, and manage state of your forms with ease",
+  "main": "index.js",
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "concurrently 'rollup -cw' 'npm run start'",
+    "start": "serve ."
+  },
+  "author": "",
+  "license": "ISC",
+  "devDependencies": {
+    "@rollup/plugin-json": "^4.0.0",
+    "@rollup/plugin-node-resolve": "^6.0.0",
+    "@rollup/plugin-replace": "^2.2.1",
+    "@rollup/plugin-typescript": "^2.0.1",
+    "@thi.ng/hdom": "^8.0.8",
+    "@thi.ng/transducers-hdom": "^2.0.32",
+    "concurrently": "^5.0.0",
+    "rollup": "^1.27.8",
+    "rollup-plugin-commonjs": "^10.1.0",
+    "rollup-plugin-postcss": "^2.0.3",
+    "serve": "^11.3.0",
+    "tslib": "^1.10.0",
+    "typescript": "^3.7.3"
+  },
+  "dependencies": {
+    "@thi.ng/atom": "^3.1.2",
+    "@thi.ng/paths": "^3.0.0",
+    "@thi.ng/rstream": "^3.0.0",
+    "@thi.ng/transducers": "^6.1.0",
+    "autoprefixer": "^9.7.3"
+  }
+}

@@ -1,0 +1,89 @@
+{
+    "lead": {
+        "influencer": {
+            "firstName": {
+                "type": "string",
+                "defaultValue": "Alex"
+            },
+            "lastName": {
+                "type": "string",
+                "defaultValue": "Lurvey"
+            },
+            "phone": {
+                "number": {
+                    "type": "string",
+                    "defaultValue": ""
+                },
+                "type": {
+                    "type": "string",
+                    "defaultValue": "Home"
+                }
+            },
+            "email": {
+                "type": "string",
+                "defaultValue": ""
+            },
+            "address": {
+                "line1": {
+                    "type": "string",
+                    "defaultValue": ""
+                },
+                "line2": {
+                    "type": "string",
+                    "defaultValue": ""
+                },
+                "city": {
+                    "type": "string",
+                    "defaultValue": ""
+                },
+                "state": {
+                    "type": "string",
+                    "defaultValue": ""
+                },
+                "zip": {
+                    "type": "string",
+                    "defaultValue": ""
+                }
+            }
+        }
+    },
+    "adlNeeds": {
+        "type": "array",
+        "defaultValue": []
+    },
+    "communities": [
+        {
+            "type": {
+                "communityId": {
+                    "type": "string",
+                    "defaultValue": ""
+                },
+                "startingPrice": {
+                    "type": "string",
+                    "defaultValue": ""
+                },
+                "secondPersonFee": {
+                    "type": "string",
+                    "defaultValue": ""
+                },
+                "communityFee": {
+                    "type": "string",
+                    "defaultValue": ""
+                },
+                "followUpAction": {
+                    "type": "string",
+                    "defaultValue": ""
+                }
+            },
+            "defaultValue": [
+                {
+                    "communityId": "11111",
+                    "startingPrice": 200,
+                    "secondPersonFee": 100,
+                    "communityFee": 50,
+                    "followUpAction": "phone call"
+                }
+            ]
+        }
+    ]
+}
