@@ -119,11 +119,13 @@ export const addFields = (newFields) => {
         }
     });
 
+    fields = { ...fields, ...newFields }; // Look into: making fields, events, manual, values all be metastreams
     form.next(newFields);
 }
 
 export const addArrayField = (path, index) => {
     const newFields = buildFieldsFromJson(arrayFields[path], `${path}[${index}]`);
+    fields = { ...fields, ...newFields };
     form.next(newFields);
 }
 
