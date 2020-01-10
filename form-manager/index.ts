@@ -3,6 +3,14 @@ import * as tx from '@thi.ng/transducers';
 import { exists, setIn } from '@thi.ng/paths';
 import { buildFieldsFromJson, buildFieldsForArray } from './parser';
 
+let fields = {}; // all fields defined in the json file (result of parser's buildFieldsFromJson)
+let events = {}; // values from DOM events - streams from calling fromDOMEvent
+let manual = {}; // values explicitly set in userland code
+let values = {}; // what you see (merge of events & manual)
+export const form = metaStream((newFields: object) => {
+    return buildStreamsFromFields({ ...fields, ...newFields });
+});
+
 const valuesToFormMapper = tx.map(f => {
     return Object.keys(f).reduce((acc, path) => {
         if (path.indexOf('[') !== -1) {
@@ -60,14 +68,6 @@ const getEventStream = (id, defaultValue) => {
 
     return meta;
 }
-
-let fields = {}; // all fields defined in the json file
-let events = {}; // values from DOM events
-let manual = {}; // values explicitly set in userland code
-let values = {}; // what you see (merge of events & manual)
-export const form = metaStream((newFields: object) => {    
-    return buildStreamsFromFields({ ...fields, ...newFields });
-});
 
 const buildStreamsFromFields = (f) => {
     const keys = Object.keys(f);
