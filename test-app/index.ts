@@ -39,7 +39,9 @@ const app = (adlNeedsData, formData) => {
         ]),
         input('lead.influencer.address.zip', 'Zip Code'),
         adlNeeds(adlNeedsData),
-        ['button', { onclick: addCommunity }, 'Add Community'],
+        ['div', { 'style': { 'margin-top': '1em' }},  [
+            ['button', { onclick: addCommunity }, 'Add Community'],
+        ]],
         ...communities
     ]]
 }

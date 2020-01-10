@@ -3,6 +3,7 @@ import { removeField } from '../form-manager';
 
 export const community = (basePath) => {
     return ['div', [
+        ['hr'],
         input(`${basePath}.communityId`, 'Community ID'),
         input(`${basePath}.startingPrice`, 'Starting Price'),
         input(`${basePath}.secondPersonFee`, 'Second Person Fee'),
