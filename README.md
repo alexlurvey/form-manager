@@ -56,7 +56,7 @@ When `buildForm` is called this object will be parsed to find each field and cre
 
 When writing your markup the `id` of the input element must be the full path to the field.
 
-That's everything needed to get started. Call buildForm with true to turn on dev mode and log your form object on each change `buildForm(true)`.
+That's everything needed to get started. Call buildForm with true to turn on dev mode and log your form object on each change `buildForm(fields, true)`.
 
 ## API
 
