@@ -11,8 +11,12 @@ import './style.css';
 
 const app = (adlNeedsData, formData) => {
     const addCommunity = () => {
-        addArrayField('communities', formData.communities.length);
+        addArrayField('communities', formData.communities ? formData.communities.length : 0);
     }
+
+    const communities = Array.isArray(formData.communities)
+        ? formData.communities.map((_, i) => community(`communities[${i}]`))
+        : [];
 
     return ['div', { class: 'app-wrapper' }, [
         input('lead.influencer.firstName', 'First Name'),
@@ -36,7 +40,7 @@ const app = (adlNeedsData, formData) => {
         input('lead.influencer.address.zip', 'Zip Code'),
         adlNeeds(adlNeedsData),
         ['button', { onclick: addCommunity }, 'Add Community'],
-        ...formData.communities.map((_, i) => community(`communities[${i}]`))
+        ...communities
     ]]
 }
 

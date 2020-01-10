@@ -1,4 +1,4 @@
-import { fromDOMEvent, merge, stream, sync, trace, metaStream } from '@thi.ng/rstream';
+import { fromDOMEvent, merge, stream, sync, trace, metaStream, Subscription, CloseMode } from '@thi.ng/rstream';
 import * as tx from '@thi.ng/transducers';
 import { exists, setIn } from '@thi.ng/paths';
 
@@ -9,11 +9,56 @@ const valuesToFormMapper = tx.map(f => {
             if (!exists(acc, arrayPath))
                 acc[arrayPath] = [];
         }
-        let p = path.replace(/\[|\]/g, '.').replace(/(\.\.)/g, '.');
-        p = p[p.length-1] === '.' ? p.substring(0, p.length-1) : p;
+        let p = path.replace(/\[|\]/g, '.').replace(/(\.\.)/g, '.'); // replace '[', ']', and '..' with '.'
+        p = p[p.length-1] === '.' ? p.substring(0, p.length-1) : p; // remove trailing '.'
         return setIn(acc, p, f[path]);
     }, {});
 })
+
+const getEventStream = (id, defaultValue) => {
+    // wrap the event stream (fromDOMEvent) in a meta stream and return a stream with default value until the element is found
+    // arbitrarily retry getting the element every 300ms up to 10 times
+    const meta = metaStream((eventStream: Subscription<Event, any>) => {
+        if (eventStream.hasOwnProperty('subs')) {
+            return eventStream;
+        }
+        
+        return stream(x => x.next(defaultValue))
+    })
+
+    let count = 1;
+    const intervalId = setInterval(() => {
+        if (count === 10 || count == -1) {
+            clearInterval(intervalId)
+            return;
+        }
+
+        let elem = document.getElementById(id);
+        if (!elem) {
+            count++;
+            return;
+        }
+
+        // TODO: handle all: https://www.w3schools.com/html/html_form_elements.asp
+        if (elem.nodeName !== 'INPUT' && elem.nodeName !== 'SELECT')
+            elem = elem.querySelector('input') || elem.querySelector('select');
+
+        if (!elem) {
+            count++;
+            return;
+        }
+
+        (elem as HTMLInputElement).value = defaultValue;
+
+        const eventStream = (elem as HTMLInputElement).type === 'checkbox'
+            ? fromDOMEvent(elem, 'input').subscribe(tx.map((e: InputEvent) => (e.target as HTMLInputElement).checked))
+            : fromDOMEvent(elem, 'input').subscribe(tx.map((e: InputEvent) => (e.target as HTMLInputElement).value));
+        meta.next(eventStream)
+        count = -1;
+    }, 300)
+
+    return meta;
+}
 
 let fields = {}; // all fields defined in the json file
 let arrayFields = {}; // track the shapes of fields that were defined within arrays so they can be added later
@@ -59,7 +104,6 @@ const buildFieldsFromJson = (fieldsObj, basePath = null, parentDefaultValues = {
                 } else {
                     return { ...acc, [path]: defaultValue };
                 }
-                
             } else {
                 if (typeof type === 'object') {
                     arrayFields[path] = type;
@@ -73,45 +117,33 @@ const buildFieldsFromJson = (fieldsObj, basePath = null, parentDefaultValues = {
     }, {});
 }
 
-const buildStreamsFromFields = (fields) => {
-    const keys = Object.keys(fields);
+const buildStreamsFromFields = (f) => {
+    const keys = Object.keys(f);
+
     for (let i = 0; i < keys.length; i ++) {
-        const m = stream(s => s.next(fields[keys[i]]));
+        if (values[keys[i]]) {
+            continue;
+        }
+
+        const m = stream(s => s.next(f[keys[i]]));
         manual[keys[i]] = m;
 
-        let elem = document.getElementById(keys[i]);
-        if (!elem) {
-            values[keys[i]] = m;
-            continue;
-        }
-
-        if (elem.nodeName !== 'INPUT' && elem.nodeName !== 'SELECT') // TODO: handle all: https://www.w3schools.com/html/html_form_elements.asp
-            elem = elem.querySelector('input') || elem.querySelector('select');
-
-        if (!elem) {
-            values[keys[i]] = m;
-            continue;
-        }
-
-        (elem as HTMLInputElement).value = fields[keys[i]]; // TODO: move this & refine initial load
-
-        const s = (elem as HTMLInputElement).type === 'checkbox'
-            ? fromDOMEvent(elem, 'input').subscribe(tx.map((e: InputEvent) => (e.target as HTMLInputElement).checked))
-            : fromDOMEvent(elem, 'input').subscribe(tx.map((e: InputEvent) => (e.target as HTMLInputElement).value));
-
+        const s = getEventStream(keys[i], f[keys[i]]);
         events[keys[i]] = s;
+
         const v = merge({ src: [ s, m ] });
         values[keys[i]] = v;
     }
 
-    return sync({ src: values, xform: valuesToFormMapper });
+    return sync({ src: values, xform: valuesToFormMapper, closeOut: CloseMode.NEVER });
 }
 
 export const setValue = (path, value) => {
     manual[path].next(value);
+    const elem = document.getElementById(path);
+    (elem as HTMLInputElement).value = value;
 }
 
-export const addField = (path) => addFields([path]);
 export const addFields = (newFields) => {
     Object.keys(newFields).forEach(path => {
         if (fields[path]) {
@@ -119,14 +151,28 @@ export const addFields = (newFields) => {
         }
     });
 
-    fields = { ...fields, ...newFields }; // Look into: making fields, events, manual, values all be metastreams
+    fields = { ...fields, ...newFields };
     form.next(newFields);
+}
+
+export const removeField = (path: string) => {
+    Object.keys(fields).forEach(field => {
+        if (field === path || (field.startsWith(path) && path.endsWith(']'))) {
+            events[field].done();
+            manual[field].done();
+            values[field].done();
+            delete events[field];
+            delete manual[field];
+            delete values[field];
+            delete fields[field];
+        }
+    })
+    form.next({})
 }
 
 export const addArrayField = (path, index) => {
     const newFields = buildFieldsFromJson(arrayFields[path], `${path}[${index}]`);
-    fields = { ...fields, ...newFields };
-    form.next(newFields);
+    addFields(newFields)
 }
 
 export const buildForm = (fieldsObj, dev = false) => {

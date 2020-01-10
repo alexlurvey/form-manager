@@ -64,7 +64,7 @@ That's everything needed to get started. Call buildForm with true to turn on dev
 -  `addField(field: { [path]: any })` - adds a field to the form at the provided path. The field is defined as an object keyed by the path. The value will be the initial value of the field.
 - `addFields(fields: { [path]: any }[])` - same as `addField` but accepts an array of fields as an argument.
 - `addArrayField(path: string, index: number)` - add an arrya index that was defined to contain additional fields instead of values so DOM event streams can be created for those new fields. 
-- `removeField` TODO: Not Implemented
+- `removeField`: ends streams for field and deletes from form.
 - `buildForm(fields: object, dev = false)` - parses the fields definition object and creates streams for DOM events, manual events, and merging of those streams back into an object of the same shape as the definition object (with the actual field values).
 
 ## Implementation Details
