@@ -1,3 +1,5 @@
+import { Field } from './field';
+
 // converts an object or JSON file describing fields of a form into a flat object
 // of field values keyed by its path within the object structure
 /*
@@ -24,48 +26,60 @@ let arrayFields = {}; // track the shapes of fields that were defined within arr
 
 const isField = obj => obj.hasOwnProperty('type') && obj.hasOwnProperty('defaultValue');
 
-export const buildFieldsForArray = (arrayKey: string, basePath: string = null) => {
-    return buildFieldsFromJson(arrayFields[arrayKey], basePath)
+const validateArrayType = (defaultValue: any, key: string) => {
+    if (!Array.isArray(defaultValue)) {
+        throw Error('Invalid schema. Array field at ' + key + ' does not have a default value of type array');
+    }
 }
 
-export const buildFieldsFromJson = (fieldsObj, basePath = null, parentDefaultValues = {}) => {
-    return Object.keys(fieldsObj).reduce((acc, key) => {
-        const current = fieldsObj[key];
-        const path = basePath ? `${basePath}.${key}` : key;
-        if (isField(current)) {
-            return { ...acc, [path]: parentDefaultValues[key] || current.defaultValue };
-        } else if (Array.isArray(current)) {
-            if (current.length !== 1)
-                throw Error('Array requires an object definition of the fields within the array');
-            if (!Array.isArray(current[0].defaultValue))
-                throw Error('Array definition specifies a default value that is not of type array');
-            
-            const { type, defaultValue } = current[0];
-            if (Array.isArray(type))
-                throw Error('Invalid array field definition. Must be an object with "type" attribute specifying the array\'s values type or an object with fields.');
+export const buildFieldsForArray = (arrayKey: string, basePath: string = null) => {
+    return buildFields(arrayFields[arrayKey], basePath);
+}
 
-            const arrayDefaults = parentDefaultValues[key] && parentDefaultValues[key].length ? parentDefaultValues[key] : defaultValue;
-            if (arrayDefaults.length > 0) {
-                if (typeof type === 'object') {
-                    let arrayPaths = {};
-                    for (let i = 0; i < arrayDefaults.length; i++) {
-                        const p = `${path}[${i}]`;
-                        arrayPaths = { ...arrayPaths, ...buildFieldsFromJson(type, p, arrayDefaults[i]) };
-                    }
-                    arrayFields[path] = type;
-                    return { ...acc, ...arrayPaths };
-                } else {
-                    return { ...acc, [path]: defaultValue };
-                }
+export const buildFields = (fieldsObj: object, basePath: string = null, parentDefaultValues = {}) => {
+    const result = {};
+
+    Object.keys(fieldsObj).forEach((key: string) => {
+        const path = basePath ? `${basePath}.${key}` : key;
+        const arrayPath = basePath && basePath.endsWith(']') ? basePath : null;
+
+        if (Array.isArray(fieldsObj[key])) {
+            if (!fieldsObj[key].length) {
+                result[key] = [];
+            } else if (typeof fieldsObj[key][0] !== 'object' || typeof fieldsObj[key][0].type !== 'object') {
+                throw new Error('Invalid array of fields schema. Must be an array with an object with a type parameter defining the fields.')
             } else {
-                if (typeof type === 'object') {
-                    arrayFields[path] = type;
-                    return acc;
+                const arrayValue = [];
+                const { type, defaultValue } = fieldsObj[key][0];
+                validateArrayType(defaultValue, key);
+                arrayFields[key] = type;
+                
+                if (defaultValue && defaultValue.length) {
+                    defaultValue.forEach((fields, i) => {
+                        if (typeof fields !== 'object') {
+                            console.log('fields', fields)
+                            throw new Error('Invalid default value for array of fields at ' + key + '. Elements must be object of fields')
+                        }
+                        arrayValue.push(buildFields(type, `${path}[${i}]`, fields));
+                    })
                 }
-                return { ...acc, [path]: defaultValue };
+                result[key] = arrayValue;
             }
-        } else {
-            return { ...acc, ...buildFieldsFromJson(current, path) }
+        } else if (isField(fieldsObj[key])) {
+            const value = parentDefaultValues[key] || fieldsObj[key].defaultValue;
+            result[key] = fieldsObj[key].type === 'array'
+                ? []
+                :  new Field(path, value, arrayPath);
+        } else if (typeof fieldsObj[key] === 'object') {
+            if (fieldsObj[key].type === 'array') {
+                validateArrayType(fieldsObj[key].defaultValue, key);
+                result[key] = fieldsObj[key].defaultValue || [];
+            } else {
+                const nestedValues = buildFields(fieldsObj[key], path, fieldsObj[key].defaultValue);
+                result[key] = nestedValues
+            }
         }
-    }, {});
+    })
+
+    return result;
 }

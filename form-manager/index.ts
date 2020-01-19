@@ -1,134 +1,132 @@
-import { fromDOMEvent, merge, stream, sync, trace, metaStream, Subscription, CloseMode } from '@thi.ng/rstream';
+import { sync, trace, metaStream, CloseMode } from '@thi.ng/rstream';
 import * as tx from '@thi.ng/transducers';
-import { exists, setIn } from '@thi.ng/paths';
-import { buildFieldsFromJson, buildFieldsForArray } from './parser';
+import { deleteIn, exists, setIn, getIn, mutIn } from '@thi.ng/paths';
+import { buildFields, buildFieldsForArray } from './parser';
+import { Field } from './field';
 
-let fields = {}; // all fields defined in the json file (result of parser's buildFieldsFromJson)
-let events = {}; // values from DOM events - streams from calling fromDOMEvent
-let manual = {}; // values explicitly set in userland code
-let values = {}; // what you see (merge of events & manual)
-export const form = metaStream((newFields: object) => {
-    return buildStreamsFromFields({ ...fields, ...newFields });
+let fields = {};
+export const form = metaStream((currentFields: object) => {
+    const flattened = flattenFields(currentFields)
+    return sync({ src: flattened, xform: valuesToFormMapper, closeOut: CloseMode.NEVER });
 });
 
-const valuesToFormMapper = tx.map(f => {
+const flattenFields = (f: object) => {
+    let result = {};
+
+    Object.keys(f).forEach(key => {
+        const val = f[key];
+        if (val instanceof Field) {
+            result[val.id] = val.deref();
+        } else if (Array.isArray(val)) {
+            result = val.reduce((acc, item) => {
+                return item instanceof Field
+                    ? { ...acc, [item.id]: item.deref() }
+                    : { ...acc, ...flattenFields(item) }
+            }, result);
+        } else if (typeof val === 'object') {
+            result = { ...result, ...flattenFields(val) }
+        }
+    })
+
+    return result;
+}
+
+const getPathString = (path: string) => {
+    let p = path.replace(/\[|\]/g, '.').replace(/(\.\.)/g, '.'); // replace '[', ']', and '..' with '.'
+    p = p[p.length-1] === '.' ? p.substring(0, p.length-1) : p; // remove trailing '.'
+    return p;
+}
+
+const valuesToFormMapper = tx.map((f: object)=> {
     return Object.keys(f).reduce((acc, path) => {
         if (path.indexOf('[') !== -1) {
             const arrayPath = path.split('[')[0];
             if (!exists(acc, arrayPath))
                 acc[arrayPath] = [];
         }
-        let p = path.replace(/\[|\]/g, '.').replace(/(\.\.)/g, '.'); // replace '[', ']', and '..' with '.'
-        p = p[p.length-1] === '.' ? p.substring(0, p.length-1) : p; // remove trailing '.'
-        return setIn(acc, p, f[path]);
+        return setIn(acc, getPathString(path), f[path]);
     }, {});
 })
 
-const getEventStream = (id, defaultValue) => {
-    // wrap the event stream (fromDOMEvent) in a meta stream and return a stream with default value until the element is found
-    // arbitrarily retry getting the element every 300ms up to 10 times
-    const meta = metaStream((eventStream: Subscription<Event, any>) => {
-        if (eventStream.hasOwnProperty('subs')) {
-            return eventStream;
-        }
-        
-        return stream(x => x.next(defaultValue))
-    })
+export const setValue = (path: string, value: any) => {
+    const f = getIn(fields, getPathString(path))
 
-    let count = 1;
-    const intervalId = setInterval(() => {
-        if (count === 10 || count == -1) {
-            clearInterval(intervalId)
-            return;
-        }
-
-        let elem = document.getElementById(id);
-        if (!elem) {
-            count++;
-            return;
-        }
-
-        // TODO: handle all: https://www.w3schools.com/html/html_form_elements.asp
-        if (elem.nodeName !== 'INPUT' && elem.nodeName !== 'SELECT')
-            elem = elem.querySelector('input') || elem.querySelector('select');
-
-        if (!elem) {
-            count++;
-            return;
-        }
-
-        (elem as HTMLInputElement).value = defaultValue;
-
-        const eventStream = (elem as HTMLInputElement).type === 'checkbox'
-            ? fromDOMEvent(elem, 'input').subscribe(tx.map((e: InputEvent) => (e.target as HTMLInputElement).checked))
-            : fromDOMEvent(elem, 'input').subscribe(tx.map((e: InputEvent) => (e.target as HTMLInputElement).value));
-        meta.next(eventStream)
-        count = -1;
-    }, 300)
-
-    return meta;
-}
-
-const buildStreamsFromFields = (f) => {
-    const keys = Object.keys(f);
-
-    for (let i = 0; i < keys.length; i ++) {
-        if (values[keys[i]]) {
-            continue;
-        }
-
-        const m = stream(s => s.next(f[keys[i]]));
-        manual[keys[i]] = m;
-
-        const s = getEventStream(keys[i], f[keys[i]]);
-        events[keys[i]] = s;
-
-        const v = merge({ src: [ s, m ] });
-        values[keys[i]] = v;
+    if (!(f instanceof Field)) {
+        throw Error('No field found at ' + path);
     }
 
-    return sync({ src: values, xform: valuesToFormMapper, closeOut: CloseMode.NEVER });
+    f.setValue(value)
 }
 
-export const setValue = (path, value) => {
-    manual[path].next(value);
-    const elem = document.getElementById(path);
-    (elem as HTMLInputElement).value = value;
-}
-
-export const addFields = (newFields) => {
+export const addFields = (newFields: object) => {
     Object.keys(newFields).forEach(path => {
-        if (fields[path]) {
+        const p = getPathString(path)
+        const currentVal = getIn(fields, p);
+        if (currentVal instanceof Field) {
             console.warn(`a field with id ${path} already exists, overriding...`);
+            currentVal.remove()
         }
+        mutIn(fields, p, new Field(path, newFields[path]))
     });
 
-    fields = { ...fields, ...newFields };
-    form.next(newFields);
+    form.next(fields);
 }
 
-export const removeField = (path: string) => {
-    Object.keys(fields).forEach(field => {
-        if (field === path || (field.startsWith(path) && path.endsWith(']'))) {
-            events[field].done();
-            manual[field].done();
-            values[field].done();
-            delete events[field];
-            delete manual[field];
-            delete values[field];
-            delete fields[field];
+export const removeField = (path: string, rootObj: object = fields) => {
+    const p = getPathString(path);
+    const field = getIn(rootObj, p);
+    
+    if (field instanceof Field) {
+        field.remove();
+    } else if (typeof field === 'object') {
+        Object.keys(field).forEach(key => {
+            if (field[key] instanceof Field)
+                removeField(`${path}.${key}`, field)
+        })
+    }
+
+    deleteIn(rootObj, p)
+
+    if (path.endsWith(']')) {
+        const index = parseInt(path[path.length - 2])
+        if (!isNaN(index)) {
+            const arrayPath = getPathString(path.substring(0, path.length - 3));
+            const array = getIn(rootObj, arrayPath);
+            const begin = array.slice(0, index);
+            const rest = array.slice(index+1, array.length);
+            rest.forEach((field: Field | object) => {
+                if (field instanceof Field) {
+                    field.shiftLeftInArray()
+                } else {
+                    Object.keys(field).forEach(key => field[key].shiftLeftInArray())
+                }
+                
+            })
+            mutIn(rootObj, arrayPath, begin.concat(rest))
         }
-    })
-    form.next({})
+    }
+
+    form.next(fields);
 }
 
-export const addArrayField = (path, index) => {
-    const newFields = buildFieldsForArray(path, `${path}[${index}]`);
-    addFields(newFields)
+export const addArrayField = (path: string, index: number) => {
+    const valAtPath = getIn(fields, path);
+    if (!Array.isArray(valAtPath)) {
+        throw Error (`Attempted to call addArrayField at ${path} but type of value is ${typeof valAtPath}`)
+    }
+
+    if (valAtPath.length < index) {
+        valAtPath.concat(Array(index - valAtPath.length))
+    } else if (valAtPath instanceof Field) {
+        valAtPath.remove();
+    }
+
+    valAtPath[index] = buildFieldsForArray(path, `${path}[${index}]`)
+    form.next(fields)
 }
 
-export const buildForm = (fieldsObj, dev = false) => {
-    fields = buildFieldsFromJson(fieldsObj);
+export const buildForm = (fieldsObj: object, dev: boolean = false) => {
+    fields = buildFields(fieldsObj);
     form.next(fields);
     if (dev) {
         form.subscribe(trace());

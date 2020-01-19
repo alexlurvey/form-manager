@@ -73,6 +73,10 @@
                 "followUpAction": {
                     "type": "string",
                     "defaultValue": ""
+                },
+                "actions": {
+                    "type": "array",
+                    "defaultValue": []
                 }
             },
             "defaultValue": [
@@ -81,7 +85,8 @@
                     "startingPrice": 200,
                     "secondPersonFee": 100,
                     "communityFee": 50,
-                    "followUpAction": "phone call"
+                    "followUpAction": "phone call",
+                    "actions": []
                 }
             ]
         }
