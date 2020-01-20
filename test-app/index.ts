@@ -1,7 +1,7 @@
 import { stream, sync } from '@thi.ng/rstream';
 import * as tx from '@thi.ng/transducers';
 import { updateDOM } from '@thi.ng/transducers-hdom';
-import { buildForm, addFields, form, addArrayField } from '../form-manager';
+import { buildForm, addFields, form, addArrayField, removeField } from '../form-manager';
 import { input } from './input';
 import { select } from './select';
 import { adlNeeds } from './adlNeeds';
@@ -42,6 +42,9 @@ const app = (adlNeedsData, formData) => {
         ['div', { 'style': { 'margin-top': '1em' }},  [
             ['button', { onclick: addCommunity }, 'Add Community'],
         ]],
+        ['div', { 'style': { 'margin-top': '1em' }},  [
+            ['button', { onclick: () => removeField('communities') }, 'Remove Communities'],
+        ]],
         ...communities
     ]]
 }
@@ -65,5 +68,5 @@ setTimeout(() => {
         'Something 5',
     ];
     adlNeedsData.next(data);
-    addFields(data.reduce((acc, _, i) => ({ ...acc, [`adlNeeds[${i}]`]: false }), {}));
+    addFields(data.map((_, i) => [ `adlNeeds[${i}]`, false ]))
 }, 3000)

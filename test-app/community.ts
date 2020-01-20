@@ -1,7 +1,7 @@
 import { input } from './input';
 import { removeField } from '../form-manager';
 
-export const community = (basePath) => {
+export const community = (basePath: string) => {
     return ['div', [
         ['hr'],
         input(`${basePath}.communityId`, 'Community ID'),
