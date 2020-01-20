@@ -79,6 +79,7 @@ export class Field implements IDeref<any> {
     remove (): void {
         this.manualStream.done()
         this.eventStream.done()
+        this.valueStream.done()
     }
 
     setValue (value: any): void {
