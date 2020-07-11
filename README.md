@@ -1,4 +1,6 @@
 # form-manager
+Abandonded in lieu of https://github.com/alexlurvey/form-compiler
+
 Status: Proof of Concept (API not defined & bugs)
 
 Something I decided to try out after being on a project that used the React form library, Formik, and not being too thrilled with it. I wondered, how hard could it be? And I wanted to use [@thi.ng/rstream](https://github.com/thi-ng/umbrella/tree/master/packages/rstream) more.
